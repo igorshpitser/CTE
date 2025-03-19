@@ -1,0 +1,70 @@
+with revenue_usd as(
+select
+       sp.continent,
+       sum(p.price) as revenue,
+       sum(case when sp.device = 'mobile' then p.price end) as revenue_mobile,
+       sum(case when sp.device = 'desktop' then p.price end) as revenue_desktop,
+       
+from `DA.order` o
+join `DA.product` p
+on o.item_id = p.item_id
+join `DA.session_params` sp
+on sp.ga_session_id = o.ga_session_id
+
+
+group by sp.continent
+),
+
+
+revenue_percent as(
+   
+    select
+        sum(p.price) over ()  as win_func
+
+
+    from `DA.order` o
+    join `DA.product` p
+    on o.item_id = p.item_id
+    join `DA.session_params` sp
+    on sp.ga_session_id = o.ga_session_id
+    limit 1
+),
+
+
+account as(
+
+
+select
+      sp.continent,  
+      count(distinct a.id) as account_cnt,
+      count(case when a.is_verified = 1 then is_verified end) as verified_account,
+      count(distinct sp.ga_session_id) as session_cnt
+
+
+from `DA.session_params` sp
+left join `DA.account_session` acs
+on sp.ga_session_id = acs.ga_session_id
+left join `DA.account` a
+on acs.account_id = a.id
+
+
+group by sp.continent
+)
+
+
+select
+      account.continent,
+      revenue_usd.revenue,
+      revenue_usd.revenue_mobile,
+      revenue_usd.revenue_desktop,
+     
+      (revenue_usd.revenue / revenue_percent.win_func) * 100 AS percent_revenue_total,
+
+
+      account.account_cnt,
+      account.verified_account,
+      account.session_cnt
+from account
+join revenue_usd
+on account.continent = revenue_usd.continent
+cross join revenue_percent
